@@ -93,24 +93,31 @@ class GamesDatabase:
     def printGames(self):
         """Gets entries from database"""
         curs = self.connection.cursor()
-        selected_games = curs.execute(
+        all_games = curs.execute(
             """
             SELECT status, num_games, player, suit, face_value, card_value FROM games
             """
         )
-        return selected_games.fetchall()
+        return all_games.fetchall()
 
     def selectGame(self, game_num: int):
         """Gets all entries for specified game number"""
         curs = self.connection.cursor()
-        selected_game = curs.execute(
-            """
+        selected_entries = curs.execute(
+            f"""
             SELECT status, num_games, player, suit, face_value, card_value FROM games
-            WHERE num_games=?
-            """, (game_num,)
+            WHERE num_games={game_num}
+            """
         )
-        print(selected_game.fetchall())
-        return selected_game.fetchall()
+        list_of_games = [{
+            "status": entry[0],
+            "num_games": entry[1],
+            "player": entry[2],
+            "suit": entry[3],
+            "face_value": entry[4],
+            "card_value": entry[5],
+        } for entry in selected_entries.fetchall()]
+        return list_of_games
 
     def selectGameStatus(self, status: str = "p"):
         """Gets num_games where game is paused"""

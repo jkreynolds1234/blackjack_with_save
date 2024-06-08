@@ -1,11 +1,11 @@
 """Runs Blackjack program"""
 
 # CHANGES TO MAKE:
-    # Handle database stuff
+    # Update paused game status to saved when ending a paused game
 
 import random
 import time
-from deck_blackjack import deck, ascii_cards, Card
+from deck_blackjack import deck, ascii_cards, Card, suit_symbols
 from database import GamesDatabase
 
 ##################################################### HELPER FUNCTIONS #####################################################
@@ -30,13 +30,25 @@ def upload_cards(player_cards: list[Card], dealer_cards: list[Card]):
         games_db.addCard("p", game_num, "Dealer", c)
 
 def download_cards():
-    """Downloads cards from chosen paused game in the games database"""
+    """Downloads cards from chosen paused game in the games database and unpacks them"""
     games_db = GamesDatabase()
     choices = games_db.selectGameStatus()
-    select = input(f"Which game do you want to load? {choices}")
-    cards = games_db.selectGame(select)
-    # Unpack result into player's cards, dealer's cards, player's score, and dealer's score
-    # cards[0][3] = 
+    select = input(f"Which game do you want to load? {choices} ")
+    game_contents = games_db.selectGame(select)
+    print(game_contents)
+    # Unpack list of dictionaries into player and dealer cards
+    player_cards = []
+    player_score = 0
+    dealer_cards = []
+    dealer_score = 0
+    for entry in game_contents:
+        if entry["player"] == "Player":
+            player_cards.append(Card(suit_symbols[entry["suit"]], entry["suit"], entry["face_value"], entry["card_value"], False))
+            player_score += entry["card_value"]
+        elif entry["player"] == "Dealer":
+            dealer_cards.append(Card(suit_symbols[entry["suit"]], entry["suit"], entry["face_value"], entry["card_value"], hidden = len(dealer_cards) == 0))
+            dealer_score += entry["card_value"]
+    return(player_cards, player_score, dealer_cards, dealer_score)
 
 def print_cards(persons_cards: list[Card], persons_score: int, person: str, display_score: bool):
     """Prints a person's hand and score"""
@@ -64,6 +76,16 @@ def ace_values(persons_cards: list[Card], persons_score: int) -> list:
         persons_cards[indices_ace_eleven.pop()].card_value = 1
         persons_score -= 10
     return indices_ace_eleven
+
+def handle_second_deal(player_cards: list[Card], player_score: int, dealer_cards: list[Card], dealer_score: int):
+    """Prints dealer's and player's cards and calls second_deal function"""
+    # Padding
+    print()
+    print()
+    # Print both hands, but don't show dealer's score
+    print_cards(dealer_cards, dealer_score, "Dealer", False)
+    print_cards(player_cards, player_score, "Player", True)
+    second_deal(player_cards, player_score, dealer_cards, dealer_score)
 
 def second_deal(player_cards: list[Card], player_score: int, dealer_cards: list[Card], dealer_score: int):
     """Handles player hitting and dealer hitting, 
@@ -159,17 +181,14 @@ def handle_win_or_bust(person: str, player_cards: list[Card], player_score: int,
 def blackjack():
     """Classic blackjack game with dealer and one player.
     Dealer will always hit if score is 16 or below."""
-
     print()
     print()
     print("WELCOME TO BLACKJACK")
     print()
-    load = input("Type 'n' to start a new game or 'l' to load your previous game: ")
+    load = input("Type 'n' to start a new game or 'l' to load a previous game: ")
     if load.lower() == "l":
-        pass
-        # SET PLAYER'S CARDS AND SCORE, SET DELAER'S CARDS AND SCORE
-        # PRINT CARDS
-        # START AT SECOND DEAL
+        player_cards, player_score, dealer_cards, dealer_score = download_cards()
+        handle_second_deal(player_cards, player_score, dealer_cards, dealer_score)
     elif load.lower() == "n":
         player_cards = []
         dealer_cards = []
@@ -203,13 +222,7 @@ def blackjack():
 
         # Handle second deal
         else:
-            # Padding
-            print()
-            print()
-            # Print both hands, but don't show dealer's score
-            print_cards(dealer_cards, dealer_score, "Dealer", False)
-            print_cards(player_cards, player_score, "Player", True)
-            second_deal(player_cards, player_score, dealer_cards, dealer_score)
+            handle_second_deal(player_cards, player_score, dealer_cards, dealer_score)
 
 blackjack()
 
