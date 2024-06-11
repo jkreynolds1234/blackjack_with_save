@@ -119,17 +119,42 @@ class GamesDatabase:
         } for entry in selected_entries.fetchall()]
         return list_of_games
 
-    def selectGameStatus(self, status: str = "p"):
-        """Gets num_games where game is paused"""
+    def selectGameStatus(self, status: str):
+        """Gets num_games where game is paused or gets win/loss/tie records"""
         curs = self.connection.cursor()
-        selected_games = curs.execute(
-            """
-            SELECT DISTINCT num_games FROM games
-            WHERE status=?
-            """, (status)
-        )
+        if status == "p":
+            selected_games = curs.execute(
+                """
+                SELECT DISTINCT num_games FROM games
+                WHERE status=?
+                """, (status)
+            )
+            result = [res[0] for res in selected_games.fetchall()]
+        else:
+            won_games = curs.execute(
+                """
+                SELECT DISTINCT num_games FROM games
+                WHERE status='w'
+                """
+            )
+            won = len([res[0] for res in won_games.fetchall()])
+            lost_games = curs.execute(
+                """
+                SELECT DISTINCT num_games FROM games
+                WHERE status='l'
+                """
+            )
+            lost = len([res[0] for res in lost_games.fetchall()])
+            tie_games = curs.execute(
+                """
+                SELECT DISTINCT num_games FROM games
+                WHERE status='t'
+                """
+            )
+            tie = len([res[0] for res in lost_games.fetchall()])
+            result = [won, lost, tie]
         # Unpack list of tuples, return as list of ints
-        return [result[0] for result in selected_games.fetchall()]
+        return result
 
 games_db = GamesDatabase()
 # games_db.selectGame(2)

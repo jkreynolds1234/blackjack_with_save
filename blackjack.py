@@ -2,6 +2,8 @@
 
 # CHANGES TO MAKE:
     # Update paused game status to saved when ending a paused game
+    # Figure out what to do when someone pauses a game twice
+    # Handle no paused games and person types "l"
 
 import random
 import time
@@ -19,23 +21,22 @@ def deal_card(indeck: list[Card], hand: list[Card], hidden: bool) -> int:
     indeck.remove(card)
     return int(card.card_value)
 
-def upload_cards(player_cards: list[Card], dealer_cards: list[Card]):
+def upload_cards(player_cards: list[Card], dealer_cards: list[Card], status: str):
     """Loads player's and dealer's cards into the games database"""
     # Create database and add player & dealer's hands
     games_db = GamesDatabase()
     game_num = games_db.gameNum()
     for c in player_cards:
-        games_db.addCard("p", game_num, "Player", c)
+        games_db.addCard(status, game_num, "Player", c)
     for c in dealer_cards:
-        games_db.addCard("p", game_num, "Dealer", c)
+        games_db.addCard(status, game_num, "Dealer", c)
 
 def download_cards():
     """Downloads cards from chosen paused game in the games database and unpacks them"""
     games_db = GamesDatabase()
-    choices = games_db.selectGameStatus()
+    choices = games_db.selectGameStatus("p")
     select = input(f"Which game do you want to load? {choices} ")
     game_contents = games_db.selectGame(select)
-    print(game_contents)
     # Unpack list of dictionaries into player and dealer cards
     player_cards = []
     player_score = 0
@@ -121,27 +122,32 @@ def second_deal(player_cards: list[Card], player_score: int, dealer_cards: list[
         if player_score > dealer_score:
             if not dealer_did_hit:
                 flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+            upload_cards(player_cards, dealer_cards, "w")
             print("YOU WIN!")
         elif player_score < dealer_score <= 21:
             if not dealer_did_hit:
                 flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+            upload_cards(player_cards, dealer_cards, "l")
             print("YOU LOSE :(")
         elif player_score == dealer_score:
             if player_score == 21 and dealer_score == 21 and len(player_cards) != len(dealer_cards):
                 if len(player_cards) < len(dealer_cards):
                     if not dealer_did_hit:
                         flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+                    upload_cards(player_cards, dealer_cards, "w")
                     print("YOU WIN!")
                 elif len(player_cards) > len(dealer_cards):
                     if not dealer_did_hit:
                         flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+                    upload_cards(player_cards, dealer_cards, "l")
                     print("YOU LOSE :(")
             else:
                 if not dealer_did_hit:
                     flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+                upload_cards(player_cards, dealer_cards, "t")
                 print("TIE GAME.")
     elif hit.lower() == "p":
-        upload_cards(player_cards, dealer_cards)
+        upload_cards(player_cards, dealer_cards, "p")
 
 def handle_win_or_bust(person: str, player_cards: list[Card], player_score: int, dealer_cards: list[Card], dealer_score: int, hit: str):
     """Handles win or bust on deal"""
@@ -156,14 +162,17 @@ def handle_win_or_bust(person: str, player_cards: list[Card], player_score: int,
     if persons_score > 21:
         if person == "Player":
             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+            upload_cards(player_cards, dealer_cards, "l")
             print("You busted.\nYOU LOSE :(")
             hit = "n"
         else:
             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+            upload_cards(player_cards, dealer_cards, "w")
             print("The dealer busted.\nYOU WIN!")
             hit = "n"
     elif player_score == 21 and dealer_score != 21:
         flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+        upload_cards(player_cards, dealer_cards, "w")
         print("YOU WIN!")
         hit = "n"
     else:
@@ -185,10 +194,22 @@ def blackjack():
     print()
     print("WELCOME TO BLACKJACK")
     print()
-    load = input("Type 'n' to start a new game or 'l' to load a previous game: ")
+    load = input("(1) Type 'n' to start a new game \n(2) Type 'l' to load a previously paused game \n(3) Type 'r' to view your records \n(4) Type 'x' to reset your records: ")
+    games_db = GamesDatabase()
     if load.lower() == "l":
         player_cards, player_score, dealer_cards, dealer_score = download_cards()
         handle_second_deal(player_cards, player_score, dealer_cards, dealer_score)
+    elif load.lower() == "r":
+        wins, losses, ties = games_db.selectGameStatus("s")
+        print()
+        print(f"Wins: {wins}")
+        print(f"Losses: {losses}")
+        print(f"Ties: {ties}")
+        time.sleep(1)
+        blackjack()
+    elif load.lower() =="x":
+        games_db.clearGamesTable()
+        blackjack()
     elif load.lower() == "n":
         player_cards = []
         dealer_cards = []
@@ -212,86 +233,22 @@ def blackjack():
         # Handle win on flip
         if player_score == 21 and dealer_score != 21:
             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+            upload_cards(player_cards, dealer_cards, "w")
             print("YOU WIN!")
         elif dealer_score == 21 and player_score != 21:
             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+            upload_cards(player_cards, dealer_cards, "l")
             print("YOU LOSE :(")
         elif player_score == dealer_score == 21:
             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
+            upload_cards(player_cards, dealer_cards, "t")
             print("TIE GAME")
 
         # Handle second deal
         else:
             handle_second_deal(player_cards, player_score, dealer_cards, dealer_score)
+    else:
+        print("Please enter a valid input.")
+        blackjack()
 
 blackjack()
-
-# def second_deal(person, player_cards, player_score, dealer_cards, dealer_score, hit):
-    #     """Deals the person's second hand and handles Ace values dynamically.
-    #      Handles win or bust on hit."""
-    #     if person == "Player":
-    #         persons_cards = player_cards
-    #         persons_score = player_score
-    #     elif person == "Dealer":
-    #         persons_cards = dealer_cards
-    #         persons_score = dealer_score
-
-    #     # Search to see if hand includes card with a value of 11
-    #     indices_ace_eleven = ace_values(persons_cards, persons_score)
-
-    #     if persons_score > 21 and len(indices_ace_eleven) == 0:
-    #         if person == "Player":
-    #             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
-    #             print("You busted.\nYOU LOSE :(")
-    #             hit = "n"
-    #         else:
-    #             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
-    #             print("The dealer busted.\nYOU WIN!")
-    #     elif player_score == 21 and dealer_score != 21:
-    #         flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
-    #         print("YOU WIN!")
-    #         hit = "n"
-    #     else:
-    #         if person == "Player":
-    #             print()
-    #             print_cards(dealer_cards, dealer_score, "Dealer", False)
-    #             print_cards(player_cards, player_score, "Player", True)
-    #             print("Inner hit")
-    #             hit = input("Do you want to hit? Type 'y' for yes, 'n' for no, or 'p' to pause: ")
-    #         # elif person == "Dealer":
-    #         #     print()
-    #         #     print_cards(dealer_cards, dealer_score, "Dealer", True)
-    #         #     print_cards(player_cards, player_score, "Player", True)
-    #     return persons_cards, persons_score, hit
-
-    # def handle_second_deal(player_cards, player_score, dealer_cards, dealer_score):
-    #     """Calls second_deal, handles score comparison"""
-    #     # Player's hits
-    #     print("Do you want to hit?")
-    #     print()
-    #     hit = input("Type 'y' for yes, 'n' for no, or 'p' to pause: ")
-    #     while hit.lower() == "y":
-    #         player_score += deal_card(deck, player_cards, False)
-    #         player_cards, player_score, hit = second_deal("Player", player_cards, player_score, dealer_cards, dealer_score, hit)
-    #     # Dealer's hits
-    #     if player_score < 21 and hit.lower() != "p":
-    #         while dealer_score <= 16:
-    #             print()
-    #             print("Dealer hits")
-    #             time.sleep(1)
-    #             # Flips dealer's card
-    #             dealer_cards[0].hidden = False
-    #             dealer_score += deal_card(deck, dealer_cards, False)
-    #             dealer_cards, dealer_score, hit = second_deal("Dealer", player_cards, player_score, dealer_cards, dealer_score, hit)
-    #             time.sleep(1)
-    ###         if player_score > dealer_score:
-    #             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
-    #             print("YOU WIN!")
-    ###         elif player_score < dealer_score <= 21:
-    #             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
-    #             print("YOU LOSE :(")
-    ###         elif player_score == dealer_score:
-    #             flip_dealer_print_both(player_cards, player_score, dealer_cards, dealer_score)
-    #             print("TIE GAME.")
-    #     if hit.lower() == "p":
-    #         load_cards(player_cards, dealer_cards)
