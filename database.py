@@ -21,7 +21,7 @@ class GamesDatabase:
                     suit,
                     face_value,
                     card_value,
-                    PRIMARY KEY (num_games, player, suit, face_value, card_value)
+                    PRIMARY KEY (num_games, player, suit, face_value)
                 )
                 """
             )
@@ -33,20 +33,24 @@ class GamesDatabase:
             print(e)
             self.connection.rollback()
 
-    def gameNum(self):
-        """Set current game number based on previous maximum num_games"""
+    def gameNum(self, game_num):
+        """Set current game number based on previous maximum num_games,
+        unless a non-zero game number is passed in"""
         curs = self.connection.cursor()
-        curs.execute(
-            """
-            SELECT MAX(num_games)
-            FROM games
-            """
-        )
-        result = curs.fetchone()
-        if result[0] is not None:
-            # Fetch returns a tuple, so access by index
-            return result[0] + 1
-        return 1
+        if game_num == 0:
+            curs.execute(
+                """
+                SELECT MAX(num_games)
+                FROM games
+                """
+            )
+            result = curs.fetchone()
+            if result[0] is not None:
+                # Fetch returns a tuple, so access by index
+                return result[0] + 1
+            return 1
+        else:
+            return game_num
 
     def addCard(self, status: str, num_games: int, player: str, card: Card):
         """Add a card and player to the database"""
@@ -70,7 +74,11 @@ class GamesDatabase:
                     '{card.value}',
                     {card.card_value}
                 )
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (num_games, player, suit, face_value)
+                DO UPDATE
+                SET
+                    status = excluded.status,
+                    card_value = excluded.card_value
                 """
             )
             self.connection.commit()
@@ -109,7 +117,7 @@ class GamesDatabase:
             WHERE num_games={game_num}
             """
         )
-        list_of_games = [{
+        game_contents = [{
             "status": entry[0],
             "num_games": entry[1],
             "player": entry[2],
@@ -117,7 +125,7 @@ class GamesDatabase:
             "face_value": entry[4],
             "card_value": entry[5],
         } for entry in selected_entries.fetchall()]
-        return list_of_games
+        return game_contents
 
     def selectGameStatus(self, status: str):
         """Gets num_games where game is paused or gets win/loss/tie records"""
@@ -154,7 +162,7 @@ class GamesDatabase:
             tie = len([res[0] for res in lost_games.fetchall()])
             result = [won, lost, tie]
         # Unpack list of tuples, return as list of ints
-        return result
+        return result        
 
 games_db = GamesDatabase()
 # games_db.selectGame(2)
