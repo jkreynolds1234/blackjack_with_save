@@ -42,6 +42,7 @@ def download_cards() -> tuple[list[Card], int, list[Card], int, int]:
     games_db = GamesDatabase()
     choices = games_db.selectGameStatus("p")
     if choices:
+        print()
         select = input(f"Which game do you want to load? {choices} ")
         game_contents = games_db.selectGame(select)
         # Unpack list of dictionaries into player and dealer cards
